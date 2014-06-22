@@ -25,8 +25,12 @@ RingBuffer.prototype.reset = function (){
   this.begin = 0x0; // First valid entry in the Ring buffer
   this.end = 0x0; // Position of the next free position at the end of the Ring buffer.
   this.length = 0x0;
+  
+  this._shrink_count = 0x0; // Only used to verify test coverage
+  this.min_capacity = 128; // smallest capacity that the buffer will shrink to
 
-  this.array = this._new_array(8); 
+  this.array = this._new_array(0x10);
+  this.empty_value = this.array[0]; // Useful to remove object pointers.
 }
 
 // Creates the storage array. Overload this method to use a different storage class
@@ -49,7 +53,7 @@ RingBuffer.prototype._realloc = function (size) {
      this.array[ i++ ] = old[ j++ ];
 
   // Copy values that wrapped around
-  j=0;
+  j = 0;
   while(i < len)
     this.array[ i++ ] = old[ j++ ];
 
@@ -64,16 +68,22 @@ RingBuffer.prototype._check_grow = function() {
 }
 
 RingBuffer.prototype._check_shrink = function() {
-  if( this.length >= 0x100 && this.length < (this.array.length>>4) )
-    this.realloc( this.array.length>>4 ); 
+  // We assume that the ringbuffer may be filled again in the near future and re-allocation is expensive
+  // so we are reluctant to shrink the buffer capacity
+  // Also, when we do shrink, we ensure the buffer is no more than half full
+  var candidate_size = this.array.length >> 2; // If we shrink we will quarter our size
+  if( this.length <= (candidate_size>>1) && candidate_size >= this.min_capacity  ) {
+    this._shrink_count++;
+    this._realloc(  candidate_size ); 
+  }
 }
 
 // Public methods:
 
 
-// No error checking 
+// No error checking. Assumes 0<= index < this.length
 RingBuffer.prototype.get = function (index) {
-  return this.array[ (this.begin + index) % this.array.length ];
+  return this.array[ (this.begin + index ) % this.array.length ];
 }
 
 // Adds to the end of the buffer. Returns the new length of the buffer
@@ -105,7 +115,9 @@ RingBuffer.prototype.pop = function () {
   -- this.length;
   this.end = (this.end + this.array.length - 1) % this.array.length;
   
-  return this.array[ this.end ];
+  var result = this.array[ this.end ];
+  this.array[ this.end ] = this.empty_value;
+  return result;
 }
 
 // Removes (and returns) the first item in the buffer
@@ -117,6 +129,8 @@ RingBuffer.prototype.shift = function () {
     
   -- this.length;
   var result = this.array[ this.begin ];
+  
+  this.array[ this.begin ] = this.empty_value;
   
   this.begin = (this.begin + 1) % this.array.length;
   
@@ -144,20 +158,25 @@ RingBuffer.prototype.toString = function() {
   return this.join(",");
 }
 
-
+/*
 RingBuffer.prototype.test = function() {
   console.log("Ring Buffer Tests test_random_sequence - Starting");
   var cb = new RingBuffer();
+  cb.min_capacity=8; // Reduce min shrink count to get more shrink operations
   var array = [];
   var i = 0x0;
   var got,expected;
   try {
-    for(; i < 40000; i++) {
+    for(; i < 100000; i++) {
       var val = i | 0, result = -1;
       if(cb.length != array.length) 
         throw "#"+i+".length got "+cb.length+" expected "+array.length;
         
       var operation = Math.floor(Math.random() * 5);
+      
+      // Test skrinkage. After 4096 operations favor reducing the size back towards zero
+      // Then for the next 4096 operations random walk away from zero size
+      if( ((i>>12)&1) == 1 && operation <2 && Math.random()>0.1) operation +=2;
 
       if(operation ==0 && (got=cb.unshift(val)) != (expected=array.unshift(val))) 
         throw "#"+i+". unshift("+val+") got "+got+" expected " + expected;
@@ -175,6 +194,10 @@ RingBuffer.prototype.test = function() {
         throw "#"+i+".shift() got "+got+" expected " + expected;
 
     }
+    console.log("shrink count #"+cb._shrink_count);
+    if(cb._shrink_count <4)
+       throw "shrink not tested "+cb._shrink_count;
+       
   } catch(e) {
     
     console.log(e);
@@ -186,4 +209,5 @@ RingBuffer.prototype.test = function() {
   return true;
 }
 
-//console.log( "Ring Buffer Tests " + (RingBuffer.prototype.test() ? "PASSED":"FAILED") );
+alert( "Ring Buffer Tests " + (RingBuffer.prototype.test() ? "PASSED":"FAILED") );
+*/
