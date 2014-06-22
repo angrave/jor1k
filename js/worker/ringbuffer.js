@@ -158,8 +158,11 @@ RingBuffer.prototype.toString = function() {
   return this.join(",");
 }
 
+
+// Testing
 /*
-RingBuffer.prototype.test = function() {
+
+RingBuffer.prototype.testCorrect = function() {
   console.log("Ring Buffer Tests test_random_sequence - Starting");
   var cb = new RingBuffer();
   cb.min_capacity=8; // Reduce min shrink count to get more shrink operations
@@ -191,7 +194,7 @@ RingBuffer.prototype.test = function() {
         throw "#"+i+".shift() got "+got+" expected " + expected;
         
       if(operation ==4 && (got=cb.get(i%array.length)) != (expected=array[i%array.length])) 
-        throw "#"+i+".shift() got "+got+" expected " + expected;
+        throw "#"+i+".get() got "+got+" expected " + expected;
 
     }
     console.log("shrink count #"+cb._shrink_count);
@@ -209,5 +212,33 @@ RingBuffer.prototype.test = function() {
   return true;
 }
 
-alert( "Ring Buffer Tests " + (RingBuffer.prototype.test() ? "PASSED":"FAILED") );
+
+
+alert( "Ring Buffer Tests " + (RingBuffer.prototype.testCorrect() ? "PASSED":"FAILED") );
+
+// Benchmark (i7 OSX) 2 million operations (enqueue N items then N dequeue items) . 
+// Firefox 30 performance is dissapointing. JS Array is a faster for N<4000 (T~300 ms). 
+// For N=10, RB is 2.5 times slower. For N=1000, RB is 60% slower. For N=10000, RB is 2 times faster.
+// Chrome 35.  N=10: RingBuffer is 7 times faster. N=10000, RB is 15 times faster
+
+RingBuffer.prototype.testPerformance = function() {
+  var N = 10 |0;
+  var maxiter = (200000 / N)|0;
+  console.log("Starting test for N="+N);
+  for(var pass=0; pass<8;pass++) {
+    var userb = (pass&1)==1;
+    var rb = userb ?  new RingBuffer() : [];
+    var tStart = (new Date()).getTime();
+    for(var iter = 0; iter < maxiter; iter++) {
+      var i=0;
+      for(i=0;i<N;i++) rb.push(i);
+      for(i=0;i<N;i++) rb.shift(i);
+    }
+    var tEnd = (new Date()).getTime();
+    console.log(pass+":"+ (userb?"RingBuffer":"JS Array")+":"+(tEnd-tStart)+" ms");
+  }  
+}
+alert("Running performance check - see console");
+RingBuffer.prototype.testPerformance();
+
 */
