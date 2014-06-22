@@ -2,7 +2,7 @@
 // -------------------- Worker ---------------------
 // -------------------------------------------------
 
-importScripts('utils.js', 'framebuffer.js', 'ethmac.js', 'ata.js',
+importScripts('utils.js', 'ringbuffer.js', 'framebuffer.js', 'ethmac.js', 'ata.js',
     'uart.js', 'touchscreen.js', 'keyboard.js', 'ram.js', 'cpu/cpu.js',
     'system.js', 'bzip2.js', 'cpu/fastcpu.js', 'cpu/safecpu.js'
     );
