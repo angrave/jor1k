@@ -33,10 +33,11 @@ var UART_MSR = 6; /* R: Modem Status Register */
 
 // constructor
 function UARTDev(outputdev, intdev) {
+    DebugMessage("UART up");
     this.intdev = intdev;
     this.odev = outputdev;
     this.Reset();  
-    this.fifo = new Array(); // receive fifo buffer. Simple JS push/shift O(N) implementation 
+    this.fifo = new RingBuffer(); // receive fifo buffer. Simple JS push/shift O(N) implementation 
 }
 UARTDev.prototype.Reset = function() {
     this.LCR = 0x3; // Line Control, reset, character has 8 bits
@@ -197,14 +198,19 @@ UARTDev.prototype.WriteReg8 = function(addr, x) {
         break;
     case UART_FCR:
         this.FCR = x;
+        DebugMessage("UART_FCR:"+hex8(x));
+       
         if (this.FCR & 2) {
-            this.fifo = new Array(); // clear receive fifo buffer
+            //this.fifo.reset(); // clear receive fifo buffer
+            DebugMessage("uart fifo reset");
         }
         break;
     case UART_LCR:
+        DebugMessage("UART_LCR:"+hex8(x));
         this.LCR = x;
         break;
     case UART_MCR:
+        DebugMessage("UART_MCR:"+hex8(x));
         this.MCR = x;
         break;
     default:
