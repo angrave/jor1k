@@ -35,7 +35,7 @@
                 </td>
                 <td style="vertical-align: top">
 	<form >
-<textarea id="studentcode" rows=30 cols=80>
+<textarea id="studentcode" rows=28 cols=80>
 #include &lt;stdio.h&gt;
 int main() {
 	fork();
@@ -43,8 +43,10 @@ int main() {
 	printf("pid=%d\n",getpid());
 	return 0;
 }
-</textarea><br>
-		<a href="#" onclick="jor1kgui.RunCode(document.getElementById('studentcode').value);return false">Run</a>
+</textarea>
+<br>
+<textarea id="gccoptions" rows=1 cols=80>-pthread -lm</textarea>
+		<a href="#" onclick="jor1kgui.RunCode(document.getElementById('studentcode').value,document.getElementById('gccoptions').value);return false">Run</a>
 			
 		</form>
                 </td>
