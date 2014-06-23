@@ -37,7 +37,7 @@ function UARTDev(outputdev, intdev) {
     this.intdev = intdev;
     this.odev = outputdev;
     this.Reset();  
-    this.fifo = new RingBuffer(); // receive fifo buffer. O(1) implementation (much faster in Chrome than js arrays)
+    this.fifo = new RingBuffer(); // receive fifo buffer.
 }
 UARTDev.prototype.Reset = function() {
     this.LCR = 0x3; // Line Control, reset, character has 8 bits
@@ -50,16 +50,38 @@ UARTDev.prototype.Reset = function() {
     this.DLH = 0;
     this.FCR = 0x0; // FIFO Control;
     this.MCR = 0x0; // Modem Control
-    this.input = 0;
+    this.XON = true; // Inband FIFO control using XON-XOFF chars
 }
 
 // To prevent the character from being overwritten we use a javascript array-based fifo and immediately request a character timeout. 
 UARTDev.prototype.ReceiveChar = function(x) {
     this.fifo.push(x);
-    this.LSR |= UART_LSR_DATA_READY;
-    this.ThrowCTI();
-
+    // testing if(x == 0x25) for(var i=0;i<2048;i++) this.fifo.push(x);
+    if(this.XON) {
+      this.LSR |= UART_LSR_DATA_READY;
+      this.ThrowCTI();
+    }
 };
+
+UARTDev.prototype.XONXOFF = function( enable ) {
+  if(this.XON === enable) {
+    return;
+  }
+  this.XON = enable;
+
+  if(this.XON) {
+    DebugMessage("UART -XON: UART_LSR_DATA_READY");
+    if(this.fifo.length > 0|0) {
+      this.LSR |= UART_LSR_DATA_READY;
+      this.ThrowCTI();
+    }
+  } else {
+    DebugMessage("UART -XOFF");
+    this.LSR &= ~UART_LSR_DATA_READY;
+    this.ClearInterrupt(UART_IIR_RDI);
+    this.ClearInterrupt(UART_IIR_CTI);
+  }
+}
 
 UARTDev.prototype.ThrowCTI = function() {
     this.ints |= 1 << UART_IIR_CTI;
@@ -84,11 +106,12 @@ UARTDev.prototype.ThrowTHRI = function() {
 };
 
 UARTDev.prototype.NextInterrupt = function() {
-    if ((this.ints & (1 << UART_IIR_CTI)) && (this.IER & UART_IER_RDI)) {
-        this.ThrowCTI();
-    }
-    else if ((this.ints & (1 << UART_IIR_THRI)) && (this.IER & UART_IER_THRI)) {
+// Priority to transmit so that we get the XOFF message quickly
+    if ((this.ints & (1 << UART_IIR_THRI)) && (this.IER & UART_IER_THRI)) {
         this.ThrowTHRI();
+    }
+    else if ((this.ints & (1 << UART_IIR_CTI)) && (this.IER & UART_IER_RDI)) {
+        this.ThrowCTI();
     }
     else {
         this.IIR = UART_IIR_NO_INT;
@@ -119,7 +142,7 @@ UARTDev.prototype.ReadReg8 = function(addr) {
     switch (addr) {
     case 0:
         {
-            var ret = 0x21;// Exclamation char - should never see this as fifo should be non-empty
+            var ret = 0x21;// !
             this.input = 0;
             this.ClearInterrupt(UART_IIR_RDI);
             this.ClearInterrupt(UART_IIR_CTI);
@@ -128,7 +151,7 @@ UARTDev.prototype.ReadReg8 = function(addr) {
                 ret = this.fifo.shift();
             }
             // Due to shift(), the fifo buffer is now smaller. Perhaps we shifted the last byte?
-            if(fifo_len > 1) { // Still more bytes to read - immediately timeout
+            if(fifo_len > 1 && this.XON) { // Still more bytes to read - immediately timeout
                 this.LSR |= UART_LSR_DATA_READY;
                 this.ThrowCTI(); // Immediately timeout - we're ready to transfer
             }
@@ -185,9 +208,15 @@ UARTDev.prototype.WriteReg8 = function(addr, x) {
     switch (addr) {
     case 0:
         this.LSR &= ~UART_LSR_FIFO_EMPTY;
+        //DebugMessage("PutChar "+hex8(x) + " "+ (x<32 ? "^"+String.fromCharCode(64+x) : String.fromCharCode(x)));
+        if( x == 0x11 || x == 0x13 ) {
+          this.XONXOFF( x == 0x11 );  
+        }
+
         this.odev.PutChar(x);
         // Data is send with a latency of zero!
-        this.LSR |= UART_LSR_FIFO_EMPTY; // send buffer is empty					
+        this.LSR |= UART_LSR_FIFO_EMPTY; // send buffer is empty
+        
         this.ThrowTHRI();
         break;
     case UART_IER:
@@ -198,15 +227,19 @@ UARTDev.prototype.WriteReg8 = function(addr, x) {
         break;
     case UART_FCR:
         this.FCR = x;
+        //DebugMessage("UART_FCR:"+hex8(x));
        
         if (this.FCR & 2) {
-            this.fifo.reset(); // clear receive fifo buffer
+            //this.fifo.reset(); // clear receive fifo buffer
+            DebugMessage("uart fifo reset");
         }
         break;
     case UART_LCR:
+        //DebugMessage("UART_LCR:"+hex8(x));
         this.LCR = x;
         break;
     case UART_MCR:
+        //DebugMessage("UART_MCR:"+hex8(x));
         this.MCR = x;
         break;
     default:
