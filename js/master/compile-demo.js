@@ -107,22 +107,21 @@ jor1kGUI.prototype.SendKeys = function(text) {
 }
 
 jor1kGUI.prototype.RunCode = function(code) {
-   this.SendKeys("\ncd ~;rm -q prog.c program\n"); 
+   this.SendKeys(String.fromCharCode(3) );
+   this.SendKeys("\ncd ~;rm prog.c program 2>/dev/null\n"); 
    // Todo: Sending CTRL-C (0x03) does not work yet
    if(code.length ===0) return;           
-   codeArray= code.match(/.{1,256}/gim); // Avoid line-limit (assume escape expansion) so split programing into shorter chuncks
+   codeArray= code.match(/[^]{1,256}/gim); // Avoid line-limit (assume escape expansion) so split programing into shorter chuncks
    for(var i=0; i < codeArray.length;i++) {
      // For happiness, escape *after* splitting
      var escaped = codeArray[i] .replace(/\\/g,"\\134").replace(/\t/g,"\\t")
-                .replace(/\n/gm,"\\n").replace(/\r/gm,"\\r").replace(/"/g,'\\"');
+                .replace(/\n/g,"\\n").replace(/\r/g,"\\r").replace(/"/g,'\\"');
 
      this.SendKeys('echo -e "');
      this.SendKeys(escaped);
-     this.SendKeys('\">> prog.c\n\r\n');
+     this.SendKeys('\">> prog.c\n');
    }
    this.SendKeys("gcc -pthread prog.c -o program && ./program\n");
 
 }
-
-
 
