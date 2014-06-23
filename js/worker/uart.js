@@ -37,7 +37,7 @@ function UARTDev(outputdev, intdev) {
     this.intdev = intdev;
     this.odev = outputdev;
     this.Reset();  
-    this.fifo = new RingBuffer(); // receive fifo buffer. Simple JS push/shift O(N) implementation 
+    this.fifo = new RingBuffer(); // receive fifo buffer. O(1) implementation (much faster in Chrome than js arrays)
 }
 UARTDev.prototype.Reset = function() {
     this.LCR = 0x3; // Line Control, reset, character has 8 bits
@@ -119,7 +119,7 @@ UARTDev.prototype.ReadReg8 = function(addr) {
     switch (addr) {
     case 0:
         {
-            var ret = 0x21;// !
+            var ret = 0x21;// Exclamation char - should never see this as fifo should be non-empty
             this.input = 0;
             this.ClearInterrupt(UART_IIR_RDI);
             this.ClearInterrupt(UART_IIR_CTI);
@@ -198,19 +198,15 @@ UARTDev.prototype.WriteReg8 = function(addr, x) {
         break;
     case UART_FCR:
         this.FCR = x;
-        DebugMessage("UART_FCR:"+hex8(x));
        
         if (this.FCR & 2) {
-            //this.fifo.reset(); // clear receive fifo buffer
-            DebugMessage("uart fifo reset");
+            this.fifo.reset(); // clear receive fifo buffer
         }
         break;
     case UART_LCR:
-        DebugMessage("UART_LCR:"+hex8(x));
         this.LCR = x;
         break;
     case UART_MCR:
-        DebugMessage("UART_MCR:"+hex8(x));
         this.MCR = x;
         break;
     default:
