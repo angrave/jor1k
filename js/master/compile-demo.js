@@ -90,7 +90,7 @@ function jor1kGUI(termid, fbid, statsid, imageurls, proxyurl)
 jor1kGUI.prototype.OnMessage = function(e) {    
     if (this.stop) return;
     if (e.data.command == "execute") this.SendToWorker("execute", 0); else
-    if (e.data.command == "ethmac") {if(this.socket) this.socket.send(e.data.data); } else
+    if (e.data.command == "ethmac") this.socket.send(e.data.data); else
     if (e.data.command == "tty") this.term.PutChar(e.data.data); else
     if (e.data.command == "GetFB") this.UpdateFramebuffer(e.data.data); else
     if (e.data.command == "Stop") {console.log("Received stop signal"); this.stop = true;} else
@@ -107,14 +107,20 @@ jor1kGUI.prototype.SendKeys = function(text) {
 }
 
 jor1kGUI.prototype.RunCode = function(code) {
-   this.SendKeys("\n"); // activate the console
+   this.SendKeys("\ncd ~;rm -q prog.c program\n"); 
    // Todo: Sending CTRL-C (0x03) does not work yet
-   this.SendKeys('echo -e "');
-   code= code .replace(/\\/g,"\\134").replace(/\t/g,"\\t")
-              .replace(/\n/g,"\\n").replace(/\r/g,"\\r").replace(/"/g,'\\"');
-   this.SendKeys(code);
-   this.SendKeys('\"> prog.c\n');
-   this.SendKeys("gcc prog.c -o program && ./program\n");
+   if(code.length ===0) return;           
+   codeArray= code.match(/.{1,256}/gim); // Avoid line-limit (assume escape expansion) so split programing into shorter chuncks
+   for(var i=0; i < codeArray.length;i++) {
+     // For happiness, escape *after* splitting
+     var escaped = codeArray[i] .replace(/\\/g,"\\134").replace(/\t/g,"\\t")
+                .replace(/\n/gm,"\\n").replace(/\r/gm,"\\r").replace(/"/g,'\\"');
+
+     this.SendKeys('echo -e "');
+     this.SendKeys(escaped);
+     this.SendKeys('\">> prog.c\n\r\n');
+   }
+   this.SendKeys("gcc -pthread prog.c -o program && ./program\n");
 
 }
 
