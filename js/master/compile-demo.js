@@ -106,7 +106,7 @@ jor1kGUI.prototype.SendKeys = function(text) {
   }
 }
 
-jor1kGUI.prototype.RunCode = function(code) {
+jor1kGUI.prototype.RunCode = function(code,compileopts) {
    this.SendKeys(String.fromCharCode(3) );
    this.SendKeys("\ncd ~;rm prog.c program 2>/dev/null\n"); 
    // Todo: Sending CTRL-C (0x03) does not work yet
@@ -115,13 +115,13 @@ jor1kGUI.prototype.RunCode = function(code) {
    for(var i=0; i < codeArray.length;i++) {
      // For happiness, escape *after* splitting
      var escaped = codeArray[i] .replace(/\\/g,"\\134").replace(/\t/g,"\\t")
-                .replace(/\n/g,"\\n").replace(/\r/g,"\\r").replace(/"/g,'\\"');
+                .replace(/\n/g,"\\n").replace(/\r/g,"\\r").replace(/"/gm,'\\"');
 
-     this.SendKeys('echo -e "');
+     this.SendKeys('echo -n -e "');
      this.SendKeys(escaped);
-     this.SendKeys('\">> prog.c\n');
+     this.SendKeys('\">> prog.c\n\r');
    }
-   this.SendKeys("gcc -pthread prog.c -o program && ./program\n");
+   this.SendKeys("gcc " + compileopts + " prog.c -o program && ./program\n");
 
 }
 
