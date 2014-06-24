@@ -30,6 +30,8 @@ var UART_MCR = 4; /* W: Modem Control Register */
 var UART_LSR = 5; /* R: Line Status Register */
 var UART_MSR = 6; /* R: Modem Status Register */
 
+// We never set UART_IIR_RDI- a higher-priority interrupt than UART_IIR_CTI.
+
 
 // constructor
 function UARTDev(outputdev, intdev) {
@@ -99,6 +101,7 @@ UARTDev.prototype.ThrowTHRI = function() {
     if (!(this.IER & UART_IER_THRI)) {
         return;
     }
+    // why "(this.IIR & UART_IIR_NO_INT)" in line below?
     if ((this.IIR & UART_IIR_NO_INT) || (this.IIR == UART_IIR_MSI) || (this.IIR == UART_IIR_THRI)) {
         this.IIR = UART_IIR_THRI;
         this.intdev.RaiseInterrupt(0x2);
@@ -106,12 +109,11 @@ UARTDev.prototype.ThrowTHRI = function() {
 };
 
 UARTDev.prototype.NextInterrupt = function() {
-// Priority to transmit so that we get the XOFF message quickly
-    if ((this.ints & (1 << UART_IIR_THRI)) && (this.IER & UART_IER_THRI)) {
-        this.ThrowTHRI();
-    }
-    else if ((this.ints & (1 << UART_IIR_CTI)) && (this.IER & UART_IER_RDI)) {
+    if ((this.ints & (1 << UART_IIR_CTI)) && (this.IER & UART_IER_RDI)) {
         this.ThrowCTI();
+    }
+    else if ((this.ints & (1 << UART_IIR_THRI)) && (this.IER & UART_IER_THRI)) {
+        this.ThrowTHRI();
     }
     else {
         this.IIR = UART_IIR_NO_INT;
